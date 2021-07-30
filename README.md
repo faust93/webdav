@@ -1,32 +1,35 @@
-# webdav
+# WebDav Server
+* Adapted from [hacdias/webdav](https://github.com/hacdias/webdav)
+* 按个人习惯修改了配置选项，参考FileZilla
 
-![Build](https://github.com/hacdias/webdav/workflows/Tests/badge.svg)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hacdias/webdav?style=flat-square)](https://goreportcard.com/report/hacdias/webdav)
-[![Version](https://img.shields.io/github/release/hacdias/webdav.svg?style=flat-square)](https://github.com/hacdias/webdav/releases/latest)
-[![Docker Pulls](https://img.shields.io/docker/pulls/hacdias/webdav)](https://hub.docker.com/r/hacdias/webdav)
+## Changes
+* 认证和默认用户配置选项删除，必须在users中配置用户
+* 支持单个用户下配置多个路径
+    * 伪造虚拟根目录，返回每个路径的别名
+    * 利用prefix实现，所以配置文件中不再开放prefix选项
+* 权限参数改为allow_r和allow_w
+    * 用户可配置写权限，默认不可写
+    * 每个路径可配置读写权限，覆盖用户权限
+* 获取文件列表时跳过无权访问项
+    * 原本golang webdav库的walkFS函数遇到无权访问的目录会停止扫描、报错，即使还有部分可访问项尚未扫描
+    * Windows下返回syscall.ERROR_ACCESS_DENIED，这里修改为跳过，继续扫描
+* 直接把golang的webdav库拉到项目中做了改动
+    * 伪造根目录需要使用webdav库的部分私有方法，仅将其改为公有
+    * 跳过无权访问项需要判断错误类型以实现跳过
+* 修改了部分文件名，避免重复
 
-## Install
+## Problems
+* 没有配置参数校验
+* walkFS函数扫描到无权访问项时返回的错误类型与OS有关，实测Mac下会报错
 
-Please refer to the [Releases page](https://github.com/hacdias/webdav/releases) for more information. There, you can either download the binaries or find the Docker commands to install WebDAV.
-
-## Usage
-
-```webdav``` command line interface is really easy to use so you can easily create a WebDAV server for your own user. By default, it runs on a random free port and supports JSON, YAML and TOML configuration. An example of a YAML configuration with the default configurations:
-
-```yaml
+## 配置文件示例
+```
 # Server related settings
 address: 0.0.0.0
-port: 0
-auth: true
+port: 1111
 tls: false
 cert: cert.pem
 key: key.pem
-prefix: /
-
-# Default user settings (will be merged)
-scope: .
-modify: true
-rules: []
 
 # CORS configuration
 cors:
@@ -35,58 +38,28 @@ cors:
   allowed_headers:
     - Depth
   allowed_hosts:
-    - http://localhost:8080
+    - http://localhost:1111
   allowed_methods:
     - GET
   exposed_headers:
     - Content-Length
     - Content-Range
 
+# 密码可以到https://bcrypt-generator.com/生成
+# 然后添加"{bcrypt}"前缀
 users:
-  - username: admin
-    password: admin
-    scope: /a/different/path
-  - username: encrypted
-    password: "{bcrypt}$2y$10$zEP6oofmXFeHaeMfBNLnP.DO8m.H.Mwhd24/TOX2MWLxAExXi4qgi"
-  - username: "{env}ENV_USERNAME"
-    password: "{env}ENV_PASSWORD"
-  - username: basic
-    password: basic
-    modify:   false
-    rules:
-      - regex: false
-        allow: false
-        path: /some/file
-      - path: /public/access/
-        modify: true
+  - username: webdav
+    password: 123456
+    scopes:
+      - root: E:/
+        alias: pce
+        rules:
+          - path: /Downloads
+            allow_w: true
+      - root: F:/
+        alias: pcf
+        rules:
+          - path: /Downloads
+            allow_r: false
+
 ```
-
-There are more ways to customize how you run WebDAV through flags and environment variables. Please run `webdav --help` for more information on that.
-
-### Systemd
-
-An example of how to use this with `systemd` is on [webdav.service.example](/webdav.service.example).
-
-### CORS
-
-The `allowed_*` properties are optional, the default value for each of them will be `*`. `exposed_headers` is optional as well, but is not set if not defined. Setting `credentials` to `true` will allow you to:
-
-1. Use `withCredentials = true` in javascript.
-2. Use the `username:password@host` syntax.
-
-### Reverse Proxy Service
-When you use a reverse proxy implementation like `Nginx` or `Apache`, please note the following fields to avoid causing `502` errors
-```text
-location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header REMOTE-HOST $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Host $http_host;
-        proxy_redirect off;
-    }
-```
-
-## License
-
-MIT © [Henrique Dias](https://hacdias.com)

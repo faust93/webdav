@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"golang.org/x/net/webdav"
+	webdav "webdav/lib_official_webdav"
 )
 
 // NoSniffFileInfo wraps any generic FileInfo interface and bypasses mime type sniffing.

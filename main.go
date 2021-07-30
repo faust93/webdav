@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"github.com/hacdias/webdav/v3/lib"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/hacdias/webdav/v3/cmd"
+	"webdav/cmd"
+	"webdav/lib"
 )
 
 func main() {
