@@ -509,6 +509,21 @@ func (h *Handler) handleUnlock(w http.ResponseWriter, r *http.Request) (status i
 	}
 }
 
+var (
+	skipErrors = []syscall.Errno{5, 32}
+)
+
+func inSkipErrors(err error) bool {
+	if e, ok := err.(*iofs.PathError); ok {
+		for _, skipError := range skipErrors {
+			if e.Err.(syscall.Errno) == skipError {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status int, err error) {
 	reqPath, status, err := h.stripPrefix(r.URL.Path)
 	if err != nil {
@@ -557,10 +572,10 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 			pstats, err = Props(ctx, h.FileSystem, h.LockSystem, reqPath, pf.Prop)
 		}
 		if err != nil {
-			if e, ok := err.(*iofs.PathError); !ok || e.Err != syscall.ERROR_ACCESS_DENIED {
-				return err
-			} else {
+			if inSkipErrors(err) {
 				return filepath.SkipDir
+			} else {
+				return err
 			}
 		}
 		href := path.Join(h.Prefix, reqPath)
