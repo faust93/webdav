@@ -32,6 +32,4 @@ users:
             allow_w: true
       - root: F:/
         alias: pcf
-        rules:
-          - path: /Downloads
-            allow_r: false
+
