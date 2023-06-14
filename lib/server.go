@@ -6,8 +6,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
 	"time"
+	"sync"
 	webdav "webdav/lib_official_webdav"
+	"gopkg.in/h2non/bimg.v1"
 )
 
 // CorsCfg is the CORS config.
@@ -21,6 +24,7 @@ type CorsCfg struct {
 }
 
 
+var mutex = &sync.Mutex{}
 
 // Config is the configuration of a WebDAV instance.
 type Config struct {
@@ -47,12 +51,13 @@ func checkPerm(s *Scope, path string, isWrite bool) bool {
 	return !isWrite || (isWrite && s.Allow_w)
 }
 
-func findScope(u *User, url string) (s *Scope, path string, absolutePath string) {
+func findScope(u *User, url string) (s *Scope, path string, absolutePath string, owncloud bool) {
 	for alias, scope := range u.Scopes {
 		if strings.HasPrefix(url, alias) {
 			s = scope
 			path = strings.TrimPrefix(url, scope.Handler.Prefix)
 			absolutePath = strings.Join([]string{s.Root, path}, "")
+			owncloud = scope.Owncloud
 			return
 		}
 	}
@@ -140,6 +145,13 @@ func (c *Config) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s tried to verify account , username is [%s]", r.RemoteAddr, username)
 	}
 
+	if strings.Contains(r.URL.Path, "status.php") {
+	    ver := []byte(`{"edition":"","installed":true,"maintenance":false,"needsDbUpgrade":false,"productname":"Nextcloud","version":"16.0.0.9","versionstring":"16.0.0"}`)
+	    w.Header().Set("Content-Type", "application/json")
+	    w.Write(ver)
+	    return
+	}
+
 	if !ok {
 		http.Error(w, "Not authorized", 401)
 		return
@@ -156,7 +168,9 @@ func (c *Config) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not authorized", 401)
 		return
 	} else {
+		mutex.Lock()
 		authorizedSource[reqMark] = time.Now()
+		mutex.Unlock()
 	}
 
 	isValid := r.Method == "GET" ||
@@ -208,7 +222,7 @@ func (c *Config) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//查找请求路径所属Scope
-	scope, path, absolutePath := findScope(user, r.URL.Path)
+	scope, path, absolutePath, owncloud := findScope(user, r.URL.Path)
 
 	if scope == nil {
 		log.Printf("Unknown scope: [%s] %s %s", user.Username, r.Method, r.URL.Path)
@@ -222,10 +236,52 @@ func (c *Config) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
-	log.Printf("[%s] %s %s", user.Username, r.Method, absolutePath)
 
 	if r.Method == "HEAD" {
 		w = newResponseWriterNoBody(w)
+	}
+
+	if r.Method == "GET" && owncloud {
+	    file := r.URL.Query().Get("file")
+
+	    width, err := strconv.Atoi(r.URL.Query().Get("x"))
+	    if err != nil {
+		log.Printf("Error: %s", err)
+		width = 512
+	    }
+
+	    height, err := strconv.Atoi(r.URL.Query().Get("y"))
+	    if err != nil {
+		log.Printf("Error: %s", err)
+		height = 512
+	    }
+
+	    options := bimg.Options{
+		Width: width,
+		Height: height,
+		Crop: true,
+		Quality: 65,
+		Type: bimg.WEBP,
+		Interpolator: bimg.Nearest,
+		StripMetadata: true,
+		Interlace: true,
+	    }
+
+	    img_path := absolutePath + file
+
+	    pix, err := bimg.Read(img_path)
+	    if err != nil {
+		log.Printf("Error: %s", err)
+		return
+	    }
+	    newPix, err := bimg.Resize(pix, options)
+	    if err != nil {
+		log.Printf("Error: %s", err)
+		return
+	    }
+	    w.Header().Set("Content-Type", "image/webp")
+	    w.Write(newPix)
+	    return
 	}
 
 	// Excerpt from RFC4918, section 9.4:

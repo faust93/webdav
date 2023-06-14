@@ -69,6 +69,7 @@ func parseScopes(raw []interface{}) map[string]*lib.Scope {
 			scope := &lib.Scope{
 				Root: "",
 				Allow_w: false,
+				Owncloud: false, 
 				Rules: nil,
 				Handler: nil,
 			}
@@ -97,6 +98,10 @@ func parseScopes(raw []interface{}) map[string]*lib.Scope {
 
 			if allowW, ok := s["allow_w"].(bool); ok {
 				scope.Allow_w = allowW
+			}
+
+			if ownc, ok := s["owncloud_preview"].(bool); ok {
+				scope.Owncloud = ownc
 			}
 
 			if rules, ok := s["rules"].([]interface{}); ok {

@@ -1,4 +1,50 @@
 # WebDav Server
+* Adapted from [Travalone/webdav](https://github.com/Travalone/webdav)
+
+Webdav server with partial Nextcloud DAV emulation layer (image previews/thumbnails generation mainly)
+
+To be used with image gallerys with NextCloud storage support, like:
+* QuickPic (Android)
+* Piktures (Android)
+
+To emulate Nextcloud DAV the following entries must be configured:
+```yaml
+  - username: owncloud
+    password: owncloud123
+    scopes:
+      - root: /srv/dav/Photos
+        alias: remote.php/webdav
+        allow_w: true
+      - root: /srv/dav/Photos
+        alias: remote.php/dav/files/owncloud
+        allow_w: true
+      - root: /srv/dav/Photos
+        alias: /index.php/core/preview.png
+        owncloud_preview: true
+```
+
+See `config.yml` for configuration example
+
+## Building
+
+1. Clone webdav repo:
+```bash
+git clone https://github.com/faust93/webdav.git
+```
+
+2. Install dependencies:
+```bash
+$ yay -S go libvips openslide
+```
+
+3. Build the app:
+```bash
+cd ./webdav
+go build
+```
+
+### Original README.md
+
 * Adapted from [hacdias/webdav](https://github.com/hacdias/webdav)
 * 按个人习惯修改了配置选项，参考FileZilla
 

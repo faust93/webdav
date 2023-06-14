@@ -23,7 +23,9 @@ func LastRequestLogIndex(ctx context.Context) {
 				// no response for 2 minutes log again
 				if k.Unix()+(60*2) < time.Now().Unix() {
 					log.Printf("%s cache will be clean\n", v)
+					mutex.Lock()
 					delete(authorizedSource, v)
+					mutex.Unlock()
 				}
 			}
 		}

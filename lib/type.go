@@ -17,6 +17,7 @@ type Rule struct {
 type Scope struct {
 	Root string
 	Allow_w bool
+	Owncloud bool
 	Rules    []*Rule
 	Handler  *webdav.Handler
 }

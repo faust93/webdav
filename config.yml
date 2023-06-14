@@ -1,9 +1,10 @@
 # Server related settings
-address: 0.0.0.0
-port: 1111
+address: 192.168.1.2
+port: 8043
+auth: true
 tls: false
-cert: cert.pem
-key: key.pem
+#cert: cert.pem
+#key: key.pem
 
 # CORS configuration
 cors:
@@ -11,25 +12,51 @@ cors:
   credentials: true
   allowed_headers:
     - Depth
+    - Authorization
+    - Content-Type
   allowed_hosts:
-    - http://localhost:1111
+    - "*"
   allowed_methods:
     - GET
+    - PUT
+    - POST
+    - PATCH
+    - DELETE
+    - OPTIONS
+    - PROPFIND
+    - MKCOL
+    - LOCK
+    - PROPPATCH
+    - COPY
+    - MOVE
+    - UNLOCK
   exposed_headers:
     - Content-Length
     - Content-Range
 
-# 密码可以到https://bcrypt-generator.com/生成
-# 然后password: "{bcrypt}加密密码"
+# The password can be either plaintext or bcrypt hash (https://bcrypt-generator.com/)
+# In case of bcrypt hash set it like this: "{bcrypt} encrypted password"
 users:
-  - username: webdav
-    password: 123456
+  - username: admin
+    password: admin123
     scopes:
-      - root: E:/
-        alias: pce
+      - root: /srv/dav
+        alias: /
+        allow_w: true
+      - root: /srv/files
+        alias: files
         rules:
           - path: /Downloads
             allow_w: true
-      - root: F:/
-        alias: pcf
-
+  - username: owncloud
+    password: owncloud123
+    scopes:
+      - root: /srv/dav/Photos
+        alias: remote.php/webdav
+        allow_w: true
+      - root: /srv/dav/Photos
+        alias: remote.php/dav/files/owncloud
+        allow_w: true
+      - root: /srv/dav/Photos
+        alias: /index.php/core/preview.png
+        owncloud_preview: true
