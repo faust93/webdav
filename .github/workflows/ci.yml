@@ -49,6 +49,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.go }}-go-ci
 
+    - name: Install vips
+      run: sudo apt install -y libvips libvips-dev libvips-tools
+
     - name: Get dependencies
       run: go get -v -t -d ./...
 
