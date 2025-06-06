@@ -11,6 +11,9 @@ import (
 	"sync"
 	webdav "webdav/lib_official_webdav"
 	"gopkg.in/h2non/bimg.v1"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 // CorsCfg is the CORS config.
@@ -256,32 +259,64 @@ func (c *Config) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		height = 512
 	    }
 
-	    options := bimg.Options{
-		Width: width,
-		Height: height,
-		Crop: true,
-		Quality: 65,
-		Type: bimg.WEBP,
-		Interpolator: bimg.Nearest,
-		StripMetadata: true,
-		Interlace: true,
-	    }
-
 	    img_path := absolutePath + file
+	    ext := filepath.Ext(file)
+	    if ext != "" {
+		ext = ext[1:]
+	    }
 
-	    pix, err := bimg.Read(img_path)
-	    if err != nil {
-		log.Printf("Error: %s", err)
+	    if ext == "mp4" {
+		filter := fmt.Sprintf("thumbnail,select='gte(t,2)',scale=%d:-1", width)
+		tmpFile, err := os.CreateTemp("", "videothumb-*")
+		if err != nil {
+			log.Printf("Video thumbnail error: %s", err)
+		}
+		thumbName := tmpFile.Name()
+		tmpFile.Close()
+		os.Remove(thumbName)
+		thumbName = thumbName + ".webp"
+		ffcmd := exec.Command("ffmpeg", "-i", img_path, "-vf", filter, "-frames:v", "1", thumbName)
+		//ffcmd.Stdout = os.Stdout
+		//ffcmd.Stderr = os.Stderr
+		err = ffcmd.Run()
+		if err != nil {
+			log.Printf("Video thumbnail error: %s", err)
+			return
+		}
+		pix, err := bimg.Read(thumbName)
+		if err != nil {
+			log.Printf("Error: %s", err)
+			return
+		}
+		w.Header().Set("Content-Type", "image/webp")
+		w.Write(pix)
+		os.Remove(thumbName)
+		return
+	    } else {
+		options := bimg.Options{
+			Width: width,
+			Height: height,
+			Crop: true,
+			Quality: 65,
+			Type: bimg.WEBP,
+			Interpolator: bimg.Nearest,
+			StripMetadata: true,
+			Interlace: true,
+		}
+		pix, err := bimg.Read(img_path)
+		if err != nil {
+			log.Printf("Error: %s", err)
+			return
+		}
+		newPix, err := bimg.Resize(pix, options)
+		if err != nil {
+			log.Printf("Error: %s", err)
+			return
+		}
+		w.Header().Set("Content-Type", "image/webp")
+		w.Write(newPix)
 		return
 	    }
-	    newPix, err := bimg.Resize(pix, options)
-	    if err != nil {
-		log.Printf("Error: %s", err)
-		return
-	    }
-	    w.Header().Set("Content-Type", "image/webp")
-	    w.Write(newPix)
-	    return
 	}
 
 	// Excerpt from RFC4918, section 9.4:
